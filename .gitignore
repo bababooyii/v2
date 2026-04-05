@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
+
+# ONNX models (large, download via script)
+onnx_models/
+*.onnx
+*.onnx.data
+
+# Checkpoints (large)
+checkpoints/
+*.pt
+*.pth
+*.safetensors
+
+# Build artifacts
+target/
+*.egg-info/
+*.egg
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Demo output
+demo_output.gif
+*.mp4
+*.avi
+
+# HuggingFace cache
+.huggingface/
+_dinov2_cache/
+_vae_cache/
+
+# Colab
+.ipynb_checkpoints/
