@@ -56,9 +56,7 @@ trainable = list(ulep.encode_head.parameters()) + list(mrgwd.latent_synth.projec
 print(f"Trainable params: {sum(p.numel() for p in trainable):,}")
 
 optimizer = torch.optim.AdamW(trainable, lr=LR, weight_decay=1e-4)
-scheduler = torch.optim.lr_scheduler.OneCycleLR(
-    optimizer, max_lr=LR, epochs=NUM_EPOCHS, steps_per_epoch=300
-)
+scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=NUM_EPOCHS)
 
 # ============================================================
 # DATASET
@@ -153,7 +151,6 @@ for epoch in range(NUM_EPOCHS):
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(trainable, max_norm=GRAD_CLIP)
                 optimizer.step()
-                scheduler.step()
                 
                 epoch_loss += loss.item()
                 num_batches += 1
@@ -170,6 +167,8 @@ for epoch in range(NUM_EPOCHS):
     lr_now = optimizer.param_groups[0]['lr']
     
     print(f"Epoch {epoch+1:2d}/{NUM_EPOCHS} | Loss: {avg_loss:.4f} | LR: {lr_now:.6f} | Time: {elapsed:.1f}s")
+    
+    scheduler.step()
     
     if avg_loss < best_loss:
         best_loss = avg_loss
