@@ -132,9 +132,8 @@ for epoch in range(NUM_EPOCHS):
                 vae_latent = mrgwd.latent_synth.projector(z_norm)
                 vae_latent_4d = vae_latent.view(vae_latent.shape[0], 4, 32, 32)
                 
-                # Decode with VAE (no gradients through VAE)
-                with torch.no_grad():
-                    decoded = mrgwd.latent_synth.vae.decode(vae_latent_4d / mrgwd.latent_synth._scale_factor).sample
+                # Decode with VAE - allow gradient flow (VAE weights frozen but gradients pass through)
+                decoded = mrgwd.latent_synth.vae.decode(vae_latent_4d / mrgwd.latent_synth._scale_factor).sample
                 
                 if decoded.shape != targets.shape:
                     decoded = F.interpolate(decoded, size=targets.shape[-2:], mode='bilinear', align_corners=False)
