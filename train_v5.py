@@ -145,9 +145,10 @@ for epoch in range(NUM_EPOCHS):
                 # Project DINO to match VAE latent
                 dino_latent = ulep.encode_head(dino_feat)
                 dino_proj = mrgwd.latent_synth.projector(dino_latent)
+                dino_proj_flat = dino_proj.flatten(1)
                 
                 # Match VAE latent
-                loss = criterion(dino_proj, vae_latent_flat.detach())
+                loss = criterion(dino_proj_flat, vae_latent_flat.detach())
                 
                 optimizer.zero_grad()
                 scaler.scale(loss).backward()
@@ -221,9 +222,10 @@ for video in test_videos[:5]:
                 dino_latent = ulep.encode_head(dino_feat)
                 dino_proj = mrgwd.latent_synth.projector(dino_latent)
                 
-                # Decode both
+                # Decode both - reshape projector output back to (B, 4, 32, 32)
+                dino_vae_latent = dino_proj.view(dino_proj.shape[0], 4, 32, 32)
                 target = mrgwd.latent_synth.vae.decode(vae_latent / vae_scale).sample
-                pred = mrgwd.latent_synth.vae.decode(dino_proj.unsqueeze(1) / vae_scale).sample
+                pred = mrgwd.latent_synth.vae.decode(dino_vae_latent / vae_scale).sample
                 
                 psnr = compute_psnr(target.squeeze(0).cpu(), pred.squeeze(0).cpu())
                 psnr_vals.append(psnr)
