@@ -129,7 +129,7 @@ for epoch in range(NUM_EPOCHS):
                     break
                 
                 # Preprocess for VAE and DINO
-                x_vae = torch.stack([preprocess_vae(f) for f in batch_frames]).cuda().half()  # VAE is fp16
+                x_vae = torch.stack([preprocess_vae(f) for f in batch_frames]).cuda()
                 x_dino = torch.stack([preprocess_dino(f) for f in batch_frames]).cuda()
                 
                 with torch.no_grad():
@@ -207,7 +207,7 @@ for video in test_videos[:5]:
         cap.release()
         
         for img in frames[:3]:
-            x_vae = preprocess_vae(img).unsqueeze(0).cuda().half()
+            x_vae = preprocess_vae(img).unsqueeze(0).cuda()
             x_dino = preprocess_dino(img).unsqueeze(0).cuda()
             
             with torch.no_grad():

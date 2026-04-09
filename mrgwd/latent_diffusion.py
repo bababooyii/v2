@@ -95,11 +95,11 @@ class LatentDiffusionSynth(nn.Module):
         try:
             from diffusers import AutoencoderKL
             self.vae = AutoencoderKL.from_pretrained(
-                "stabilityai/sd-vae-ft-mse", torch_dtype=torch.float16
+                "stabilityai/sd-vae-ft-mse", torch_dtype=torch.float32
             )
             for p in self.vae.parameters():
                 p.requires_grad_(False)
-            print("[MR-GWD] Loaded SD-VAE decoder (fp16)")
+            print("[MR-GWD] Loaded SD-VAE decoder (fp32)")
         except Exception as e:
             print(f"[MR-GWD] VAE load failed ({e}), using ConvFallback.")
             self.use_vae = False
