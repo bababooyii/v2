@@ -28,13 +28,22 @@ class ULEPBackbone(nn.Module):
 
     def _load_dino(self):
         try:
+            # Try with Dinov2Model directly for newer transformers
             from transformers import AutoModel
-            self.model = AutoModel.from_pretrained(self.DINO_MODEL)
+            import warnings
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                # Try different import paths for transformers 5.x
+                self.model = AutoModel.from_pretrained(
+                    self.DINO_MODEL,
+                    trust_remote_code=True
+                )
             for p in self.model.parameters():
                 p.requires_grad_(False)
             self.mode = "dino"
+            print(f"[ULEP] Loaded DINOv2-small (CPU mode)")
         except Exception as e:
-            print(f"[ULEP] DINOv2 unavailable ({e}), using fallback ConvNet backbone.")
+            print(f"[ULEP] DINOv2 unavailable ({type(e).__name__}: {e}), using fallback ConvNet backbone.")
             self._build_fallback()
 
     def _build_fallback(self):

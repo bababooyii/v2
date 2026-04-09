@@ -71,20 +71,22 @@ class LatentDiffusionSynth(nn.Module):
     """
     Stage 1 synthesis: z_t → L_t (256p semantic image).
 
-    Tries to use the SD-VAE decoder for high quality output;
-    falls back to ConvFallbackDecoder for CPU/no-CUDA environments.
+    Uses pretrained SD-VAE decoder for high quality output.
+    Falls back to ConvFallbackDecoder for CPU-only environments.
     """
 
-    def __init__(self, latent_dim: int = 512, use_vae: bool = True):
+    def __init__(self, latent_dim: int = 512, use_vae: bool = True, force_vae: bool = False):
         super().__init__()
         self.latent_dim = latent_dim
-        self.use_vae = use_vae and torch.cuda.is_available()
+        # Use VAE if: requested AND (GPU available OR force=True)
+        self.use_vae = use_vae and (torch.cuda.is_available() or force_vae)
 
         self.projector = LatentProjector(latent_dim)
 
         if self.use_vae:
             self._load_vae()
         else:
+            print("[MR-GWD] Using ConvFallbackDecoder (CPU mode)")
             self.decoder = ConvFallbackDecoder(latent_dim)
 
         self._scale_factor = 0.18215  # SD VAE scaling constant

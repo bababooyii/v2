@@ -34,13 +34,28 @@ class KeyframePacket:
     @classmethod
     def from_bytes(cls, data: bytes) -> "KeyframePacket":
         buf = io.BytesIO(data)
-        assert buf.read(2) == b"KF"
-        frame_idx, latent_dim = struct.unpack("!IH", buf.read(6))
-        n_pkts = struct.unpack("!H", buf.read(2))[0]
+        magic = buf.read(2)
+        if magic != b"KF":
+            raise ValueError(f"Invalid keyframe magic: {magic}")
+        # !IH = unsigned int (4 bytes) + unsigned short (2 bytes) = 6 bytes
+        header = buf.read(6)
+        if len(header) < 6:
+            raise ValueError(f"Incomplete header: {len(header)} bytes")
+        frame_idx, latent_dim = struct.unpack("!IH", header)
+        n_pkts_bytes = buf.read(2)
+        if len(n_pkts_bytes) < 2:
+            raise ValueError("Missing packet count")
+        n_pkts = struct.unpack("!H", n_pkts_bytes)[0]
         gtm_packets = []
         for _ in range(n_pkts):
-            pkt_len = struct.unpack("!I", buf.read(4))[0]
-            gtm_packets.append(GTMPacket.from_bytes(buf.read(pkt_len)))
+            pkt_len_bytes = buf.read(4)
+            if len(pkt_len_bytes) < 4:
+                raise ValueError("Missing packet length")
+            pkt_len = struct.unpack("!I", pkt_len_bytes)[0]
+            pkt_data = buf.read(pkt_len)
+            if len(pkt_data) < pkt_len:
+                raise ValueError(f"Incomplete packet: {len(pkt_data)}/{pkt_len}")
+            gtm_packets.append(GTMPacket.from_bytes(pkt_data))
         return cls(frame_idx=frame_idx, latent_dim=latent_dim, gtm_packets=gtm_packets)
 
 
@@ -70,15 +85,37 @@ class PredictivePacket:
     @classmethod
     def from_bytes(cls, data: bytes) -> "PredictivePacket":
         buf = io.BytesIO(data)
-        assert buf.read(2) == b"PF"
-        frame_idx, latent_dim, top_k = struct.unpack("!IHH", buf.read(8))
-        n_idx = struct.unpack("!H", buf.read(2))[0]
-        indices = [struct.unpack("!H", buf.read(2))[0] for _ in range(n_idx)]
-        n_pkts = struct.unpack("!H", buf.read(2))[0]
+        magic = buf.read(2)
+        if magic != b"PF":
+            raise ValueError(f"Invalid predictive magic: {magic}")
+        header = buf.read(8)
+        if len(header) < 8:
+            raise ValueError(f"Incomplete header: {len(header)} bytes")
+        frame_idx, latent_dim, top_k = struct.unpack("!IHH", header)
+        n_idx_bytes = buf.read(2)
+        if len(n_idx_bytes) < 2:
+            raise ValueError("Missing index count")
+        n_idx = struct.unpack("!H", n_idx_bytes)[0]
+        indices = []
+        for _ in range(n_idx):
+            idx_bytes = buf.read(2)
+            if len(idx_bytes) < 2:
+                raise ValueError("Incomplete index")
+            indices.append(struct.unpack("!H", idx_bytes)[0])
+        n_pkts_bytes = buf.read(2)
+        if len(n_pkts_bytes) < 2:
+            raise ValueError("Missing packet count")
+        n_pkts = struct.unpack("!H", n_pkts_bytes)[0]
         gtm_packets = []
         for _ in range(n_pkts):
-            pkt_len = struct.unpack("!I", buf.read(4))[0]
-            gtm_packets.append(GTMPacket.from_bytes(buf.read(pkt_len)))
+            pkt_len_bytes = buf.read(4)
+            if len(pkt_len_bytes) < 4:
+                raise ValueError("Missing packet length")
+            pkt_len = struct.unpack("!I", pkt_len_bytes)[0]
+            pkt_data = buf.read(pkt_len)
+            if len(pkt_data) < pkt_len:
+                raise ValueError(f"Incomplete packet: {len(pkt_data)}/{pkt_len}")
+            gtm_packets.append(GTMPacket.from_bytes(pkt_data))
         return cls(frame_idx=frame_idx, latent_dim=latent_dim, top_k=top_k,
                    indices=indices, gtm_packets=gtm_packets)
 

@@ -10,15 +10,31 @@ import torch.nn.functional as F
 from pathlib import Path
 from typing import Optional, Tuple, List
 from PIL import Image
+import numpy as np
 
 def _get_transform():
-    """Lazy import to avoid torchvision issues on Python 3.14 + torch CPU."""
-    import torchvision.transforms as T
-    return T.Compose([
-        T.Resize((224, 224)),
-        T.ToTensor(),
-        T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-    ])
+    """Simple transforms without torchvision (avoids Python 3.14 compatibility issues)."""
+    # Using PIL + numpy for transforms instead of torchvision
+    return _PILTransform()
+
+
+class _PILTransform:
+    """Simple transform pipeline for PIL images."""
+    
+    def __init__(self):
+        self.mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+        self.std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+        self.resize_size = (224, 224)
+    
+    def __call__(self, img):
+        # Resize
+        img = img.resize(self.resize_size, Image.LANCZOS)
+        # To tensor [0, 1] as float32
+        arr = np.array(img, dtype=np.float32) / 255.0
+        # Normalize
+        arr = (arr - self.mean) / self.std
+        # To tensor (C, H, W)
+        return torch.from_numpy(arr.transpose(2, 0, 1)).to(dtype=torch.float32)
 
 from .backbone import ULEPBackbone
 from .encode_head import EncodeHead

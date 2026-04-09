@@ -34,6 +34,7 @@ class GTMPacket:
 
     def to_bytes(self) -> bytes:
         buf = io.BytesIO()
+        # !HHHHHHi = 5*2 + 4 + 4 = 18 bytes total
         buf.write(struct.pack("!HHHHHHi", self.chunk_idx, self.chunk_size,
                               self.n_bits_r, self.n_bits_theta,
                               len(self.theta_indices), self.padded_dim, self.r_idx))
@@ -46,11 +47,25 @@ class GTMPacket:
     @classmethod
     def from_bytes(cls, data: bytes) -> "GTMPacket":
         buf = io.BytesIO(data)
+        # !HHHHHHi = 16 bytes (5*H + I + i)
+        header = buf.read(16)
+        if len(header) < 16:
+            raise ValueError(f"GTMPacket header incomplete: {len(header)}/16 bytes")
         chunk_idx, chunk_size, n_bits_r, n_bits_theta, n_theta, padded_dim, r_idx = \
-            struct.unpack("!HHHHHHi", buf.read(14))
-        theta_indices = [struct.unpack("!H", buf.read(2))[0] for _ in range(n_theta)]
-        qjl_len = struct.unpack("!H", buf.read(2))[0]
+            struct.unpack("!HHHHHHi", header)
+        theta_indices = []
+        for _ in range(n_theta):
+            t_bytes = buf.read(2)
+            if len(t_bytes) < 2:
+                raise ValueError("Incomplete theta index")
+            theta_indices.append(struct.unpack("!H", t_bytes)[0])
+        qjl_len_bytes = buf.read(2)
+        if len(qjl_len_bytes) < 2:
+            raise ValueError("Missing QJL length")
+        qjl_len = struct.unpack("!H", qjl_len_bytes)[0]
         qjl_bits = buf.read(qjl_len)
+        if len(qjl_bits) < qjl_len:
+            raise ValueError(f"Incomplete QJL bits: {len(qjl_bits)}/{qjl_len}")
         return cls(chunk_idx=chunk_idx, chunk_size=chunk_size, r_idx=r_idx,
                    theta_indices=theta_indices, qjl_bits=qjl_bits,
                    n_bits_r=n_bits_r, n_bits_theta=n_bits_theta, padded_dim=padded_dim)

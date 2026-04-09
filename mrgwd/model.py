@@ -28,13 +28,14 @@ class MRGWD(nn.Module):
     def __init__(self, latent_dim: int = 512,
                  output_size: tuple = (512, 512),
                  use_vae: bool = False,
-                 upscale: int = 4):
+                 upscale: int = 4,
+                 force_vae: bool = False):
         super().__init__()
         self.latent_dim = latent_dim
         self.output_size = output_size
 
         # Stage 1: z_t → 256p image
-        self.latent_synth = LatentDiffusionSynth(latent_dim=latent_dim, use_vae=use_vae)
+        self.latent_synth = LatentDiffusionSynth(latent_dim=latent_dim, use_vae=use_vae, force_vae=force_vae)
 
         # Stage 2: 256p → output_size image
         self.upsample_net = TemporalUpsampleNet(upscale=upscale)
