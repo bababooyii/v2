@@ -142,13 +142,17 @@ for epoch in range(NUM_EPOCHS):
                 z = ulep.encode_head(features)
                 z_norm = F.normalize(z, dim=-1)
                 
-                # GTM encode/decode (this is the compression!)
-                z_cpu = z_norm.detach().cpu()
-                packets = gtm_enc.encode(z_cpu)
-                z_q = gtm_dec.decode(packets, 512).cuda()
+                # Process each sample through GTM individually
+                decoded_list = []
+                for j in range(z_norm.shape[0]):
+                    z_single = z_norm[j:j+1]  # (1, 512)
+                    z_cpu = z_single.detach().cpu()
+                    packets = gtm_enc.encode(z_cpu)
+                    z_q = gtm_dec.decode(packets, 512).cuda()
+                    dec = mrgwd.latent_synth(z_q.float())
+                    decoded_list.append(dec)
                 
-                # Decode (with gradients through projector)
-                decoded = mrgwd.latent_synth(z_q.float())
+                decoded = torch.stack(decoded_list)
                 
                 if decoded.shape != targets.shape:
                     decoded = F.interpolate(decoded, size=targets.shape[-2:], mode='bilinear', align_corners=False)
