@@ -92,9 +92,10 @@ print(f"Trainable params: {sum(p.numel() for p in trainable):,}")
 optimizer = torch.optim.AdamW(trainable, lr=LR, weight_decay=1e-4)
 scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=NUM_EPOCHS)
 
-# GTM
-gtm_enc = GTMEncoder(n_bits=6, qjl_proj_dim=64)
-gtm_dec = GTMDecoder(qjl_proj_dim=64)
+# ============================================================
+# TRAINING - Simple: train bottleneck to compress/expand VAE latent
+# (Skip GTM during training, add it after)
+# ============================================================
 
 # ============================================================
 # LOAD DATASET
@@ -162,28 +163,11 @@ for epoch in range(NUM_EPOCHS):
                     vae_latent = mrgwd.latent_synth.vae.encode(x).latent_dist.sample()
                     vae_latent_scaled = vae_latent * vae_scale
                 
-                # Compress through bottleneck
+                # Compress through bottleneck (just train compression, skip GTM during training)
                 compressed = bottleneck(vae_latent_scaled)
                 
-                # GTM encode/decode - compress to bits
-                # Process each sample individually
-                decoded_list = []
-                for j in range(compressed.shape[0]):
-                    z_single = compressed[j]  # (4, 32, 32)
-                    z_flat = z_single.flatten()  # 4096
-                    
-                    # Normalize for GTM (keep as 1D)
-                    z_norm = z_flat / (z_flat.norm() + 1e-8)
-                    
-                    # Encode single sample (1D tensor)
-                    packets = gtm_enc.encode(z_norm.cpu())
-                    z_dec = gtm_dec.decode(packets, 4096).cuda()
-                    
-                    # Decode single sample
-                    dec = mrgwd.latent_synth.vae.decode(z_dec.view(1, 4, 32, 32) / vae_scale).sample
-                    decoded_list.append(dec)
-                
-                decoded = torch.cat(decoded_list, dim=0)
+                # Directly decode without GTM for training
+                decoded = mrgwd.latent_synth.vae.decode(compressed / vae_scale).sample
                 
                 # Loss: reconstruction quality
                 loss = criterion(decoded, x)
@@ -221,9 +205,13 @@ for epoch in range(NUM_EPOCHS):
 print("\n✅ Training complete!")
 
 # ============================================================
-# EVALUATION
+# EVALUATION (with GTM compression)
 # ============================================================
 print("\n🧪 Evaluating...")
+
+# Initialize GTM for evaluation
+gtm_enc = GTMEncoder(n_bits=6, qjl_proj_dim=64)
+gtm_dec = GTMDecoder(qjl_proj_dim=64)
 
 bottleneck.eval()
 mrgwd.latent_synth.vae.eval()
