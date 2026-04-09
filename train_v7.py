@@ -172,11 +172,11 @@ for epoch in range(NUM_EPOCHS):
                     z_single = compressed[j]  # (4, 32, 32)
                     z_flat = z_single.flatten()  # 4096
                     
-                    # Normalize for GTM
+                    # Normalize for GTM (keep as 1D)
                     z_norm = z_flat / (z_flat.norm() + 1e-8)
                     
-                    # Encode single sample
-                    packets = gtm_enc.encode(z_norm.unsqueeze(0).cpu())
+                    # Encode single sample (1D tensor)
+                    packets = gtm_enc.encode(z_norm.cpu())
                     z_dec = gtm_dec.decode(packets, 4096).cuda()
                     
                     # Decode single sample
@@ -258,7 +258,7 @@ for video in test_videos[:8]:
                 z_flat = compressed.squeeze(0).flatten()
                 z_norm = z_flat / (z_flat.norm() + 1e-8)
                 
-                packets = gtm_enc.encode(z_norm.unsqueeze(0).cpu())
+                packets = gtm_enc.encode(z_norm.cpu())
                 z_dec = gtm_dec.decode(packets, 4096).cuda()
                 
                 # Decode
