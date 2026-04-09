@@ -167,24 +167,23 @@ for epoch in range(NUM_EPOCHS):
                 
                 # GTM encode/decode - compress to bits
                 # Process each sample individually
-                reconstructed_list = []
+                decoded_list = []
                 for j in range(compressed.shape[0]):
-                    z_single = compressed[j:j+1].squeeze(0)  # (4, 32, 32) -> need to flatten
-                    z_flat = z_single.flatten()
+                    z_single = compressed[j]  # (4, 32, 32)
+                    z_flat = z_single.flatten()  # 4096
                     
                     # Normalize for GTM
                     z_norm = z_flat / (z_flat.norm() + 1e-8)
                     
+                    # Encode single sample
                     packets = gtm_enc.encode(z_norm.unsqueeze(0).cpu())
                     z_dec = gtm_dec.decode(packets, 4096).cuda()
                     
-                    reconstructed_list.append(z_dec)
+                    # Decode single sample
+                    dec = mrgwd.latent_synth.vae.decode(z_dec.view(1, 4, 32, 32) / vae_scale).sample
+                    decoded_list.append(dec)
                 
-                reconstructed = torch.stack([r.view(1, 4, 32, 32) for r in reconstructed_list])
-                
-                # Decode with VAE
-                with torch.no_grad():
-                    decoded = mrgwd.latent_synth.vae.decode(reconstructed / vae_scale).sample
+                decoded = torch.cat(decoded_list, dim=0)
                 
                 # Loss: reconstruction quality
                 loss = criterion(decoded, x)
