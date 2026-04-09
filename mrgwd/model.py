@@ -48,7 +48,7 @@ class MRGWD(nn.Module):
     def synthesize(self, z_t: torch.Tensor,
                    prev_frame: Optional[torch.Tensor] = None) -> torch.Tensor:
         """
-        Synthesize a frame from z_t.
+        Synthesize a frame from z_t (no gradients).
 
         z_t:       (D,) latent state
         prev_frame: (3, H, W) optional override; uses internal state if None
@@ -57,18 +57,11 @@ class MRGWD(nn.Module):
         prev = prev_frame if prev_frame is not None else self._prev_frame
 
         with torch.no_grad():
-            # Stage 1: semantic image
-            L_t = self.latent_synth(z_t)                          # (3, 256, 256)
-
-            # Resize L_t to target if needed (keep aspect ratio)
+            L_t = self.latent_synth(z_t)
             if L_t.shape[-2:] != (256, 256):
                 L_t = F.interpolate(L_t.unsqueeze(0), size=(256, 256),
                                     mode="bilinear", align_corners=False).squeeze(0)
-
-            # Stage 2: upsample with temporal consistency
-            F_hat = self.upsample_net(L_t, prev)                  # (3, H_out, W_out)
-
-            # Resize to desired output
+            F_hat = self.upsample_net(L_t, prev)
             if F_hat.shape[-2:] != self.output_size:
                 F_hat = F.interpolate(F_hat.unsqueeze(0),
                                       size=self.output_size,
@@ -76,6 +69,33 @@ class MRGWD(nn.Module):
 
         self._prev_frame = F_hat.detach()
         return F_hat
+
+    def direct_decode(self, z_t: torch.Tensor,
+                      prev_frame: Optional[torch.Tensor] = None) -> torch.Tensor:
+        """
+        Direct decode with gradient flow enabled (for training).
+
+        z_t:       (D,) or (B, D) latent state
+        prev_frame: (3, H, W) optional previous frame for temporal consistency
+        returns:   (3, 256, 256) in [-1, 1]
+        """
+        squeeze = z_t.dim() == 1
+        if squeeze:
+            z_t = z_t.unsqueeze(0)
+
+        L_t = self.latent_synth(z_t)
+        if L_t.shape[-2:] != (256, 256):
+            L_t = F.interpolate(L_t, size=(256, 256), mode="bilinear", align_corners=False)
+
+        if prev_frame is not None:
+            F_hat = self.upsample_net(L_t, prev_frame.unsqueeze(0))
+            F_hat = F_hat.squeeze(0)
+        else:
+            F_hat = F.interpolate(L_t, size=self.output_size, mode="bilinear", align_corners=False)
+            F_hat = F_hat.squeeze(0)
+
+        self._prev_frame = F_hat.detach()
+        return F_hat if not squeeze else F_hat.squeeze(0)
 
     def synthesize_batch(self, z_batch: torch.Tensor) -> torch.Tensor:
         """Synthesize multiple frames sequentially (temporal consistency maintained)."""
