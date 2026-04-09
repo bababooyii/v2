@@ -143,8 +143,8 @@ for epoch in range(NUM_EPOCHS):
                     dino_feat = ulep.backbone(x_dino)
                 
                 # Project DINO to match VAE latent
-                dino_latent = ulep.encode_head(dino_feat)
-                dino_proj = mrgwd.latent_synth.projector(dino_latent)
+                dino_latent = ulep.encode_head(dino_feat.float())
+                dino_proj = mrgwd.latent_synth.projector(dino_latent.float())
                 dino_proj_flat = dino_proj.flatten(1)
                 
                 # Match VAE latent
@@ -219,8 +219,8 @@ for video in test_videos[:5]:
                 
                 # Predicted
                 dino_feat = ulep.backbone(x_dino)
-                dino_latent = ulep.encode_head(dino_feat)
-                dino_proj = mrgwd.latent_synth.projector(dino_latent)
+                dino_latent = ulep.encode_head(dino_feat.float())
+                dino_proj = mrgwd.latent_synth.projector(dino_latent.float())
                 
                 # Decode both - reshape projector output back to (B, 4, 32, 32)
                 dino_vae_latent = dino_proj.view(dino_proj.shape[0], 4, 32, 32)
