@@ -99,7 +99,6 @@ mrgwd.train()
 
 criterion = nn.MSELoss()
 vae_scale = mrgwd.latent_synth._scale_factor
-scaler = torch.amp.GradScaler('cuda')
 best_loss = float('inf')
 
 for epoch in range(NUM_EPOCHS):
@@ -151,11 +150,9 @@ for epoch in range(NUM_EPOCHS):
                 loss = criterion(dino_proj_flat, vae_latent_flat.detach())
                 
                 optimizer.zero_grad()
-                scaler.scale(loss).backward()
-                scaler.unscale_(optimizer)
+                loss.backward()
                 torch.nn.utils.clip_grad_norm_(trainable, max_norm=GRAD_CLIP)
-                scaler.step(optimizer)
-                scaler.update()
+                optimizer.step()
                 scheduler.step()
                 
                 epoch_loss += loss.item()
