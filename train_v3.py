@@ -145,12 +145,9 @@ def target_tensor(img, size=OUTPUT_SIZE):
     return torch.from_numpy(arr).permute(2, 0, 1).float()
 
 # ============================================================
-# LOSS FUNCTION - MSE + Edge-aware
+# LOSS FUNCTION - MSE (simplified for stability)
 # ============================================================
-def edge_loss(pred, target):
-    pred_edge = F.conv2d(pred, torch.ones(1, 1, 3, 3).cuda() / 9, padding=1)
-    target_edge = F.conv2d(target, torch.ones(1, 1, 3, 3).cuda() / 9, padding=1)
-    return F.mse_loss(pred_edge, target_edge)
+criterion = nn.MSELoss()
 
 criterion = nn.MSELoss()
 
@@ -215,7 +212,6 @@ for epoch in range(NUM_EPOCHS):
                 
                 # Loss
                 loss = criterion(decoded, targets.float())
-                loss += 0.1 * edge_loss(decoded, targets)
                 
                 # Backward
                 optimizer.zero_grad()
