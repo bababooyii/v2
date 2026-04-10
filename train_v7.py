@@ -243,7 +243,7 @@ for video in test_videos[:8]:
                 compressed = bottleneck(vae_latent_scaled)
                 
                 # GTM encode/decode
-                z_flat = compressed.squeeze(0).flatten()
+                z_flat = compressed.squeeze(0).flatten().cuda()
                 z_norm = z_flat / (z_flat.norm() + 1e-8)
                 
                 packets = gtm_enc.encode(z_norm.cpu())
