@@ -37,9 +37,21 @@ class OmniQuantApex:
     PSNR: ~45 dB (beats Netflix 8K)
     """
     
-    def __init__(self, device='cuda'):
+    def __init__(self, device=None):
+        # Auto-detect device, fallback to CPU for P100 compatibility
+        if device is None:
+            if torch.cuda.is_available():
+                try:
+                    # Test CUDA
+                    x = torch.zeros(1).cuda()
+                    device = 'cuda'
+                except:
+                    device = 'cpu'
+            else:
+                device = 'cpu'
+        
         self.device = device
-        print("Loading VAE...")
+        print(f"Loading VAE on {device}...")
         self.mrgwd = MRGWD(
             latent_dim=512, 
             output_size=(1080, 1920), 
@@ -257,6 +269,10 @@ class OmniQuantApex:
         
         cap.release()
         
+        if not psnr_vals:
+            print("No frames processed!")
+            return
+        
         avg_psnr = np.mean(psnr_vals)
         
         # Calculate bitrate
@@ -275,7 +291,7 @@ def main():
     parser.add_argument('command', choices=['encode', 'decode', 'test'])
     parser.add_argument('input', help='Input file')
     parser.add_argument('output', nargs='?', help='Output file')
-    parser.add_argument('--device', default='cuda', help='Device (cuda/cpu)')
+    parser.add_argument('--device', default=None, help='Device (cuda/cpu, auto-detect if not specified)')
     
     args = parser.parse_args()
     
