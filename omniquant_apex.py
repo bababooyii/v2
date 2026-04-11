@@ -157,6 +157,10 @@ class OmniQuantApex:
         
         cap.release()
         
+        if frame_count == 0:
+            print("Error: No frames encoded")
+            return 0
+        
         # Save all latent data
         with open(output_path, 'ab') as f:
             for latent in latent_data_list:
@@ -231,9 +235,29 @@ class OmniQuantApex:
         print(f"Testing {input_path}...")
         
         cap = cv2.VideoCapture(input_path)
+        if not cap.isOpened():
+            print(f"Error: Cannot open video file {input_path}")
+            # Try to find video files
+            print("Looking for video files...")
+            import glob
+            video_files = glob.glob("/kaggle/input/**/*.mp4", recursive=True)[:5]
+            if video_files:
+                print(f"Found videos: {video_files}")
+                input_path = video_files[0]
+                cap = cv2.VideoCapture(input_path)
+            else:
+                print("No video files found")
+                return
+        
+        if not cap.isOpened():
+            print("Error: Cannot open video")
+            return
+            
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         fps = cap.get(cv2.CAP_PROP_FPS)
+        
+        print(f"Video: {width}x{height}, {fps} fps")
         
         psnr_vals = []
         
