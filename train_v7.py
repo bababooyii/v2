@@ -252,7 +252,7 @@ for video in test_videos[:8]:
                 # Decode
                 dec = mrgwd.latent_synth.vae.decode(z_dec.view(1, 4, 32, 32) / vae_scale).sample
                 
-                psnr = compute_psnr(target, dec.squeeze(0).cpu())
+                psnr = compute_psnr(target.cpu(), dec.squeeze(0).cpu())
                 psnr_vals.append(psnr)
                 
     except Exception as e:

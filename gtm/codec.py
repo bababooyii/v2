@@ -191,7 +191,7 @@ class GTMDecoder:
 
             start = i * cs
             end = start + pkt.chunk_size
-            out[start:end] = v_chunk
+            out[start:end] = v_chunk.to(out.device)
 
         return out
 
