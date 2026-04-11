@@ -168,10 +168,10 @@ class GTMDecoder:
             self._qz_cache[n_bits] = LloydMaxQuantizer(n_bits).default_fit(scale=math.pi / 2)
         return self._qz_cache[n_bits]
 
-    def decode(self, packets: List[GTMPacket], orig_dim: int) -> torch.Tensor:
+    def decode(self, packets: List[GTMPacket], orig_dim: int, device: str = "cpu") -> torch.Tensor:
         """Reconstruct latent vector from packets."""
         cs = 32
-        out = torch.zeros(orig_dim)
+        out = torch.zeros(orig_dim, device=device)
 
         for pkt in sorted(packets, key=lambda p: p.chunk_idx):
             i = pkt.chunk_idx

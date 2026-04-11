@@ -247,7 +247,7 @@ for video in test_videos[:8]:
                 z_norm = z_flat / (z_flat.norm() + 1e-8)
                 
                 packets = gtm_enc.encode(z_norm.cpu())
-                z_dec = gtm_dec.decode(packets, 4096).cuda()
+                z_dec = gtm_dec.decode(packets, 4096, device='cuda')
                 
                 # Decode
                 dec = mrgwd.latent_synth.vae.decode(z_dec.view(1, 4, 32, 32) / vae_scale).sample
