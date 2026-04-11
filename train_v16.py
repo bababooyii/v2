@@ -44,6 +44,10 @@ print("VAE loaded")
 # ============================================================
 # TEST: Upscale low-res to 8K using VAE latent
 # ============================================================
+def preprocess(img, size):
+    arr = np.array(img.resize(size)).astype(np.float32) / 127.5 - 1.0
+    return torch.from_numpy(arr).permute(2, 0, 1).float()
+
 print(f"\n🧪 Testing 8K upscaling from 240p source...")
 
 # This is what happens with old videos upscaled to 8K
@@ -119,12 +123,16 @@ print(f"Source: 320x240 (Upscaled to target resolution)")
 print(f"Bitrate: 640 bytes/frame @ 30fps = 0.15 Mbps (CONSTANT)")
 print("="*60)
 
-for res, psnr in results:
-    mp = (res[0] * res[1]) / 1e6
-    print(f"{res[0]:4d}x{res[1]:4d} ({mp:4.1f}MP): PSNR {psnr:5.2f} dB | {0.15:.2f} Mbps")
-
-print("\n🎯 Comparison:")
-print("Our 4K:   0.15 Mbps (PSNR: ~" + f"{results[2][1]:.0f}" + " dB)")
-print("Netflix: 15-25 Mbps (PSNR: ~40 dB)")
-print("\n✅ We achieve similar quality at 100x lower bitrate!")
+if results:
+    for res, psnr in results:
+        mp = (res[0] * res[1]) / 1e6
+        print(f"{res[0]:4d}x{res[1]:4d} ({mp:4.1f}MP): PSNR {psnr:5.2f} dB | {0.15:.2f} Mbps")
+    
+    print("\n🎯 Comparison:")
+    if len(results) >= 3:
+        print("Our 4K:   0.15 Mbps (PSNR: ~" + f"{results[2][1]:.0f}" + " dB)")
+    print("Netflix: 15-25 Mbps (PSNR: ~40 dB)")
+    print("\n✅ We achieve similar quality at 100x lower bitrate!")
+else:
+    print("No results")
 print("\n🎯 For 8K, we'd need A100 GPU - but mathematically same bitrate.")
