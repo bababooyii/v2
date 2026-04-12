@@ -96,6 +96,10 @@ class SimpleVAECodec:
         
         self.scale_factor = 0.18215
         
+        # VAE produces (4, 64, 64) latent for 512x512 input
+        self.latent_shape = (4, 64, 64)
+        self.latent_size = 4 * 64 * 64  # = 16384
+        
     def quantize_latent(self, latent, bits=10):
         levels = 2 ** bits
         latent_min = latent.min()
@@ -116,10 +120,11 @@ class SimpleVAECodec:
             latent_scaled = latent * self.scale_factor
             quantized = self.quantize_latent(latent_scaled, bits=10)
             
-        return quantized.squeeze(0).cpu().numpy().copy()
+        return quantized.squeeze(0).cpu().numpy().copy()  # shape: (4, 64, 64)
     
     def decode_frame(self, latent, output_size=(512, 512)):
-        latent = torch.from_numpy(latent.copy()).reshape(1, 4, 32, 32).to(self.device)
+        # Reshape to correct latent shape
+        latent = torch.from_numpy(latent.copy()).reshape(1, *self.latent_shape).to(self.device)
         
         with torch.no_grad():
             decoded = self.vae.decode(latent / self.scale_factor).sample
