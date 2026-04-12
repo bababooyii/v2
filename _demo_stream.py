@@ -122,12 +122,12 @@ def main():
     parser.add_argument('--height', type=int, default=480, help='Video height')
     parser.add_argument('--fps', type=int, default=30, help='Frames per second')
     parser.add_argument('--duration', type=int, default=3, help='Duration in seconds')
-    parser.add_argument('--device', default='auto', help='Device')
+    parser.add_argument('--device', default='cpu', help='Device')
     
     args = parser.parse_args()
     
-    # Auto-detect device
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    # Auto-detect device - force CPU for P100 compatibility
+    device = 'cpu'
     print(f"Using device: {device}")
     
     codec = SimpleVAECodec(device=device)
