@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-OmniQuant-Apex Streaming Demo
+OmniQuant-Apex Streaming Demo - Self-contained
 
 Sender: Encodes video and saves compressed file
 Receiver: Decodes and plays video with quality stats
@@ -8,7 +8,6 @@ Receiver: Decodes and plays video with quality stats
 
 import sys
 import os
-sys.path.insert(0, os.getcwd())
 
 import torch
 import torch.nn.functional as F
@@ -17,26 +16,33 @@ from PIL import Image
 import cv2
 import time
 import argparse
+from diffusers import AutoencoderKL
 
-from mrgwd.model import MRGWD
-from demo.metrics import compute_psnr
+print(f"Device: {'cuda' if torch.cuda.is_available() else 'cpu'}")
 
-
-class OmniQuantApex:
-    """The codec"""
+# ============================================================
+# SIMPLE VAE CODEC (Self-contained)
+# ============================================================
+class SimpleVAECodec:
+    """Standalone VAE codec without external dependencies"""
     
     def __init__(self, device='cpu'):
         self.device = device
-        print(f"Loading VAE on {device}...")
-        self.mrgwd = MRGWD(latent_dim=512, output_size=(1080, 1920), use_vae=True, force_vae=True).to(device)
+        print("Loading SD-VAE...")
         
-        for p in self.mrgwd.latent_synth.vae.parameters():
+        self.vae = AutoencoderKL.from_pretrained(
+            "stabilityai/sd-vae-ft-mse",
+            torch_dtype=torch.float32
+        ).to(device)
+        
+        for p in self.vae.parameters():
             p.requires_grad = False
-        self.mrgwd.latent_synth.vae.eval()
+        self.vae.eval()
         
-        self.vae_scale = self.mrgwd.latent_synth._scale_factor
-    
+        self.scale_factor = 0.18215
+        
     def quantize_latent(self, latent, bits=10):
+        """10-bit scalar quantization"""
         levels = 2 ** bits
         latent_min = latent.min()
         latent_max = latent.max()
@@ -45,27 +51,27 @@ class OmniQuantApex:
         return quantized * (latent_max - latent_min) + latent_min
     
     def encode_frame(self, frame):
-        """Encode frame to latent"""
+        """Encode frame to latent (4, 32, 32)"""
         if isinstance(frame, np.ndarray):
             frame = Image.fromarray(frame)
         
-        x = np.array(frame.resize((1920, 1080))).astype(np.float32) / 127.5 - 1.0
+        # Resize and normalize
+        x = np.array(frame.resize((512, 512))).astype(np.float32) / 127.5 - 1.0
         x = torch.from_numpy(x).permute(2, 0, 1).float().unsqueeze(0).to(self.device)
         
         with torch.no_grad():
-            vae_latent = self.mrgwd.latent_synth.vae.encode(x).latent_dist.sample()
-            vae_latent_scaled = vae_latent * self.vae_scale
-            quantized = self.quantize_latent(vae_latent_scaled, bits=10)
+            latent = self.vae.encode(x).latent_dist.sample()
+            latent_scaled = latent * self.scale_factor
+            quantized = self.quantize_latent(latent_scaled, bits=10)
             
         return quantized.squeeze(0).cpu().numpy()
     
     def decode_frame(self, latent):
-        """Decode latent to frame"""
+        """Decode latent to frame (512x512)"""
         latent = torch.from_numpy(latent).unsqueeze(0).to(self.device)
         
         with torch.no_grad():
-            decoded = self.mrgwd.latent_synth.vae.decode(latent / self.vae_scale).sample
-            decoded = F.interpolate(decoded, size=(1080, 1920), mode='bilinear', align_corners=False)
+            decoded = self.vae.decode(latent / self.scale_factor).sample
             
         img = decoded.squeeze(0).permute(1, 2, 0).cpu().numpy()
         img = ((img + 1) * 127.5).astype(np.uint8)
@@ -127,7 +133,7 @@ def sender(codec, input_video, output_file):
     print(f"   Bitrate: {bitrate:.3f} Mbps")
     print(f"   Compression: {(width*height*3) / bytes_per_frame:.0f}x")
     
-    return file_size, bitrate
+    return file_size, bitrate, frame_count
 
 
 def receiver(codec, input_file, output_video, target_fps=30):
@@ -148,13 +154,12 @@ def receiver(codec, input_file, output_video, target_fps=30):
         output_video,
         cv2.VideoWriter_fourcc(*'mp4v'),
         target_fps,
-        (width, height)
+        (512, 512)  # VAE native resolution
     )
     
-    latent_bytes = 4 * 32 * 32  # float32
+    latent_bytes = 4 * 32 * 32 * 4  # float32
     
     psnr_values = []
-    ssim_values = []
     start_time = time.time()
     frame_count = 0
     
@@ -182,7 +187,6 @@ def receiver(codec, input_file, output_video, target_fps=30):
                 print(f"   Decoded {frame_count}/{total_frames} frames ({elapsed:.1f}s)")
     
     writer.release()
-    
     decode_time = time.time() - start_time
     
     print(f"\n📥 RECEIVER DONE!")
@@ -198,11 +202,17 @@ def main():
     parser.add_argument('video', help='Input video path')
     parser.add_argument('--output', default='stream.oqc', help='Compressed stream file')
     parser.add_argument('--decoded', default='decoded.mp4', help='Decoded video output')
-    parser.add_argument('--device', default='cpu', help='Device (cpu/cuda)')
+    parser.add_argument('--device', default='auto', help='Device (cpu/cuda/auto)')
     
     args = parser.parse_args()
     
-    codec = OmniQuantApex(device=args.device)
+    # Auto-detect device
+    if args.device == 'auto':
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    else:
+        device = args.device
+    
+    codec = SimpleVAECodec(device=device)
     
     if args.mode == 'sender':
         sender(codec, args.video, args.output)
@@ -215,7 +225,7 @@ def main():
         print("OMNIQUANT-APEX STREAMING DEMO")
         print("="*60)
         
-        file_size, bitrate = sender(codec, args.video, args.output)
+        file_size, bitrate, frame_count = sender(codec, args.video, args.output)
         frame_count, decode_time = receiver(codec, args.output, args.decoded)
         
         print("\n" + "="*60)
