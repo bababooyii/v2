@@ -59,7 +59,9 @@ class SimpleVAECodec:
         return quantized.squeeze(0).cpu().numpy()
     
     def decode_frame(self, latent):
-        latent = torch.from_numpy(latent).unsqueeze(0).to(self.device)
+        """Decode latent to frame (512x512)"""
+        # Reshape from flat to 4D
+        latent = torch.from_numpy(latent).reshape(1, 4, 32, 32).to(self.device)
         
         with torch.no_grad():
             decoded = self.vae.decode(latent / self.scale_factor).sample
